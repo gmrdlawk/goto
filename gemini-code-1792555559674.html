@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>goto - 내 공연 아카이브</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1 onclick="location.href='main.html'">goto</h1>
+    <div class="header-btns">
+      <button onclick="openModal()">+ 공연 추가</button>
+      <button class="secondary" onclick="logout()">로그아웃</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div id="concertGrid" class="grid">
+      <!-- 공연 카드가 여기에 dynamic 생성됩니다 -->
+    </div>
+  </div>
+
+  <!-- 공연 추가 모달 -->
+  <div id="addModal" class="modal">
+    <div class="modal-content">
+      <h3 style="margin-bottom: 16px;">새 공연 기록하기</h3>
+      <form id="addConcertForm">
+        <div class="input-group">
+          <label for="title">공연 제목</label>
+          <input type="text" id="title" required placeholder="예: 콜드플레이 내한공연">
+        </div>
+        <div class="input-group">
+          <label for="date">관람 날짜</label>
+          <input type="date" id="date" required>
+        </div>
+        <div class="input-group">
+          <label for="seat">좌석 정보</label>
+          <input type="text" id="seat" placeholder="예: 지정석 A구역 12열 5번">
+        </div>
+        <div class="input-group">
+          <label>공연 포스터 (이미지 파일)</label>
+          <div id="posterDropZone" class="drop-zone">
+            클릭하거나 사진을 드래그해서 올려주세요
+            <input type="file" id="posterInput" accept="image/*" style="display:none;">
+          </div>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button type="submit" style="flex: 1;">저장</button>
+          <button type="button" class="secondary" onclick="closeModal()" style="flex: 1;">취소</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const currentUser = localStorage.getItem('goto_current_user');
+    if (!currentUser) window.location.href = 'index.html';
+
+    let posterBase64 = '';
+
+    function getStorageKey() {
+      return `goto_data_${currentUser}`;
+    }
+
+    function getConcerts() {
+      return JSON.parse(localStorage.getItem(getStorageKey()) || '[]');
+    }
+
+    function renderConcerts() {
+      const grid = document.getElementById('concertGrid');
+      const concerts = getConcerts();
+      
+      if (concerts.length === 0) {
+        grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #8e8e8e; padding: 40px 0;">기록된 공연이 없습니다. 공연을 추가해보세요!</p>';
+        return;
+      }
+
+      grid.innerHTML = concerts.map((item, idx) => `
+        <div class="card" onclick="location.href='detail.html?id=${idx}'">
+          <div class="card-img-wrapper">
+            <img src="${item.poster || 'https://via.placeholder.com/300x400?text=No+Poster'}" alt="${item.title}">
+          </div>
+          <div class="card-info">
+            <div class="title">${item.title}</div>
+            <div class="date">${item.date}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // 모달 관리
+    function openModal() { document.getElementById('addModal').style.display = 'flex'; }
+    function closeModal() { 
+      document.getElementById('addModal').style.display = 'none'; 
+      posterBase64 = '';
+      document.getElementById('posterDropZone').innerText = '클릭하거나 사진을 드래그해서 올려주세요';
+    }
+
+    // 파일 업로드 (드래그 앤 드롭 & 불러오기)
+    const dropZone = document.getElementById('posterDropZone');
+    const posterInput = document.getElementById('posterInput');
+
+    dropZone.addEventListener('click', () => posterInput.click());
+    
+    posterInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) {
+        handleFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    function handleFile(file) {
+      if (!file || !file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        posterBase64 = e.target.result;
+        dropZone.innerText = `선택된 파일: ${file.name}`;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // 폼 제출
+    document.getElementById('addConcertForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const newConcert = {
+        title: document.getElementById('title').value,
+        date: document.getElementById('date').value,
+        seat: document.getElementById('seat').value,
+        poster: posterBase64,
+        mediaList: [] // 현장 사진/영상
+      };
+
+      const concerts = getConcerts();
+      concerts.unshift(newConcert); // 최신순 저장
+      localStorage.setItem(getStorageKey(), JSON.stringify(concerts));
+
+      closeModal();
+      document.getElementById('addConcertForm').reset();
+      renderConcerts();
+    });
+
+    function logout() {
+      localStorage.removeItem('goto_current_user');
+      window.location.href = 'index.html';
+    }
+
+    renderConcerts();
+  </script>
+</body>
+</html>
